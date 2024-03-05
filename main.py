@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
 
 HEADLESS_MODE = True
 LPU_URL = "https://onlinelpu.ru/gp111po111/record"
@@ -56,13 +57,8 @@ def get_number_of_tickets(d):
         return 0
 
 
-def notification(s: str):
-    bot.send_message(bots_chat_id, s)
-    print("NOTIFICATION: " + s)
-
-
-def update_tickets(doctor: str, spec_id: int):
-    t = doctor.split("\n")
+def update_tickets(doctor, spec_id: int, driver):
+    t = doctor.text.split("\n")
     if len(t) < 2:
         return
     try:
@@ -70,12 +66,24 @@ def update_tickets(doctor: str, spec_id: int):
     except KeyError:
         cached = None
     if t[1] == '?':
-        pass  # resps[t[0]].append(Ticket(t[0], i, 0, ""))
+        try:
+            resps.pop(t[0])
+        except KeyError:
+            pass
     else:
         if cached is None or (cached.tickets < int(t[1])):
             spec = specialists[spec_id]
-            notification(f"tickets number increased for {t[0]}, spec is {spec}")
+            n = f"tickets number increased for {t[0]}, spec is {spec}"
+            tg_notification_with_screenshot(driver, doctor, n)
+            print("NOTIFICATION: " + n)
         resps.update({t[0]: Ticket(t[0], spec_id, int(t[1]), t[2])})
+
+
+def tg_notification_with_screenshot(driver: webdriver, ch, n: str):
+    ActionChains(driver).move_to_element(ch).perform()
+    driver.get_screenshot_as_file('/tmp/appointment.png')
+    img = open('/tmp/appointment.png', 'rb')
+    bot.send_photo(chat_id=bots_chat_id, caption=n, photo=img)
 
 
 def fetch_tickets(driver):
@@ -101,8 +109,7 @@ def fetch_tickets(driver):
         try:
             l = driver.find_element(By.XPATH, f"//*[contains(text(), '{spec}')]/following-sibling::div")
             for ch in l.find_elements(By.XPATH, "*"):
-                update_tickets(ch.text, i)
-
+                update_tickets(ch, i, driver)
         except selenium.common.exceptions.NoSuchElementException or selenium.common.exceptions.UnexpectedAlertPresentException:
             continue
 
