@@ -17,8 +17,10 @@ ENV DISPLAY=:99
 # upgrade pip
 RUN pip install --upgrade pip
 
-# install selenium
-RUN pip install selenium
-
 WORKDIR /app
-COPY main.py .
+COPY main.py props.py requirements.txt .
+
+# install selenium
+RUN pip install -r requirements.txt
+
+CMD python main.py
